@@ -27,5 +27,6 @@ Requests to the OnQ CMS must be authenticated with a valid token generated in **
 - [Playlist](playlist.md)
 - [Report](report.md)
 - [Category & Tag](category-tag.md)
+- [External Import (VAMS)](external-import.md)
 - [Seedooh Integration](seedooh.md)
 - [API Job (Async Polling)](api-job.md)
