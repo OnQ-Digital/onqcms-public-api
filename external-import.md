@@ -15,6 +15,7 @@ The External Import API allows external systems (e.g., VAMS) to programmatically
   - [1.3. Warnings](#13-warnings)
   - [1.4. Errors](#14-errors)
   - [1.5. Sync Behavior](#15-sync-behavior)
+  - [1.6. Context Passthrough](#16-context-passthrough)
 - [2. Status Endpoint](#2-status-endpoint)
   - [2.1. Request Format (GET)](#21-request-format-get)
   - [2.2. Request Format (POST)](#22-request-format-post)
@@ -68,6 +69,7 @@ Receives booking items, translates them into campaigns, and reconciles with exis
 | category | string | No | Category name |
 | vaType | string | No | External slot type name (used for slot mapping) |
 | name | string | No | Alternative external slot name |
+| context | object | No | Opaque passthrough object. Stored and echoed back in sync and status responses. Max 4 KB per item. See [Context Passthrough](#16-context-passthrough). |
 
 **Example Request**:
 
@@ -84,7 +86,10 @@ Receives booking items, translates them into campaigns, and reconciles with exis
             "vaType": "Behind POS Counter",
             "brand": "TOM FORD",
             "category": "Beauty",
-            "url": "https://example.com/path/4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa.mp4?Expires=..."
+            "url": "https://example.com/path/4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa.mp4?Expires=...",
+            "context": {
+                "groupKey": "abc-123"
+            }
         },
         {
             "orderNumber": "3940",
@@ -95,7 +100,10 @@ Receives booking items, translates them into campaigns, and reconciles with exis
             "vaType": "Behind POS Counter",
             "brand": "TOM FORD",
             "category": "Beauty",
-            "url": "https://example.com/path/4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa.mp4?Expires=..."
+            "url": "https://example.com/path/4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa.mp4?Expires=...",
+            "context": {
+                "groupKey": "abc-123"
+            }
         }
     ]
 }
@@ -134,7 +142,12 @@ The sync response covers booking outcomes only. Use the [Status endpoint](#2-sta
             "campaign_id": 456,
             "action": "created",
             "sub_campaigns": 1,
-            "players_matched": 2
+            "players_matched": 2,
+            "context": [
+                {
+                    "groupKey": "abc-123"
+                }
+            ]
         }
     ],
     "warnings": [],
@@ -270,6 +283,42 @@ All URLs for a booking item failed content_id extraction. The item was skipped.
 
 **Content dedup**: Content is identified by the filename UUID extracted from the URL path (the `content_id`). If the same `content_id` already exists in the CMS, the existing content is reused without re-downloading.
 
+## 1.6. Context Passthrough
+
+Each item can include an optional `context` object — an opaque JSON value that the CMS stores and echoes back in both sync and status responses. This allows external systems to attach their own identifiers (e.g., VAMS `groupKey`) without the CMS needing to understand them.
+
+**Rules**:
+- Maximum 4 KB per item (items exceeding this will produce a warning and the `context` will be dropped for that item)
+- The CMS treats `context` as opaque — it is stored and returned as-is, never parsed or validated
+- In the **sync response**, each campaign's `context` is an array of all distinct `context` values from the items that formed that campaign (since multiple items with the same `orderNumber` are grouped into one campaign)
+- In the **status response**, each content entry's `context` is the `context` from the item that originally provided that content URL. Warnings (e.g., `dimension_mismatch`) also include the `context` for the affected content, so callers can route warnings to the correct booking
+- If no items include `context`, the field is omitted from responses
+
+**Example**: Two items with the same `orderNumber` but different `context` values:
+
+```json
+{
+    "items": [
+        { "orderNumber": "3940", "context": { "groupKey": "abc-123" }, "..." : "..." },
+        { "orderNumber": "3940", "context": { "groupKey": "def-456" }, "..." : "..." }
+    ]
+}
+```
+
+The sync response campaign will include both:
+
+```json
+{
+    "campaign_name": "VAMS #3940 - TOM FORD",
+    "campaign_id": 456,
+    "action": "created",
+    "context": [
+        { "groupKey": "abc-123" },
+        { "groupKey": "def-456" }
+    ]
+}
+```
+
 ---
 
 # 2. Status Endpoint
@@ -334,7 +383,10 @@ GET /api/external_import_status.php?campaign_id=456&content_ids=4vwhq2gg-zju2-lq
             "status": "ready",
             "width": 1920,
             "height": 1080,
-            "format": "mp4"
+            "format": "mp4",
+            "context": {
+                "groupKey": "abc-123"
+            }
         },
         {
             "content_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -342,7 +394,10 @@ GET /api/external_import_status.php?campaign_id=456&content_ids=4vwhq2gg-zju2-lq
             "status": "encoding_queued",
             "width": 1920,
             "height": 1080,
-            "format": "mp4"
+            "format": "mp4",
+            "context": {
+                "groupKey": "abc-123"
+            }
         }
     ],
     "warnings": [
@@ -354,7 +409,10 @@ GET /api/external_import_status.php?campaign_id=456&content_ids=4vwhq2gg-zju2-lq
             "player_id": 567,
             "player_store": "3201DS0061",
             "player_dimensions": "1080x1920",
-            "tolerance": 5
+            "tolerance": 5,
+            "context": {
+                "groupKey": "abc-123"
+            }
         }
     ]
 }
@@ -368,8 +426,7 @@ The `warnings` array is only present when `campaign_id` is provided and dimensio
 |--------|-------------|
 | `ready` | Content is ready for playback |
 | `encoding_queued` | Video is queued for encoding to h264 baseline |
-| `encoding_error` | Encoding failed |
-| `encoding_timeout` | Encoding timed out |
+| `encoding_error` | Encoding failed (includes timeouts) |
 | `not_found` | Content ID not found in the system (not yet downloaded or invalid) |
 
 ## 2.5. Warnings
@@ -387,7 +444,10 @@ Returned when `campaign_id` is provided. Content dimensions (aspect ratio) do no
     "player_id": 567,
     "player_store": "3201DS0061",
     "player_dimensions": "1080x1920",
-    "tolerance": 5
+    "tolerance": 5,
+    "context": {
+        "groupKey": "abc-123"
+    }
 }
 ```
 
@@ -400,5 +460,6 @@ Returned when `campaign_id` is provided. Content dimensions (aspect ratio) do no
 | `player_store` | Player store name for identification |
 | `player_dimensions` | Player configured width x height |
 | `tolerance` | Aspect ratio tolerance percentage configured for this player |
+| `context` | The `context` from the item that provided this content (omitted if none) |
 
 **Action required**: The affected player will skip this campaign during playback. Provide content with a matching aspect ratio to resolve.
