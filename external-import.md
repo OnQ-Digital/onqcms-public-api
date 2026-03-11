@@ -16,12 +16,14 @@ The External Import API allows external systems (e.g., VAMS) to programmatically
   - [1.4. Errors](#14-errors)
   - [1.5. Sync Behavior](#15-sync-behavior)
   - [1.6. Context Passthrough](#16-context-passthrough)
+  - [1.7. Dry Run](#17-dry-run)
 - [2. Status Endpoint](#2-status-endpoint)
   - [2.1. Request Format (GET)](#21-request-format-get)
   - [2.2. Request Format (POST)](#22-request-format-post)
   - [2.3. Response Format](#23-response-format)
   - [2.4. Content Status Values](#24-content-status-values)
   - [2.5. Warnings](#25-warnings)
+- [3. Dry Run Endpoint](#3-dry-run-endpoint)
 
 ---
 
@@ -119,7 +121,7 @@ Receives booking items, translates them into campaigns, and reconciles with exis
 }
 ```
 
-A dry run performs translation and classification (which campaigns would be created, updated, or deactivated) but does not make any changes. The response will have `"result": "dry_run"` instead of `"ok"`.
+A dry run performs translation and classification (which campaigns would be created, updated, or deactivated) but does not make any changes. The response will have `"result": "dry_run"` instead of `"ok"`. The `campaigns` array includes full details for each affected campaign — see [1.7. Dry Run](#17-dry-run). A dedicated dry run endpoint is also available — see [3. Dry Run Endpoint](#3-dry-run-endpoint).
 
 ## 1.2. Response Format
 
@@ -222,6 +224,20 @@ A URL in the payload could not be parsed to extract the content identifier (file
 
 **Action required**: Check that the URL has a valid file path with a filename and extension (e.g., `.mp4`, `.png`).
 
+### Context Exceeded
+
+An item's `context` object exceeds the 4 KB limit. The context is dropped for that item but the item is otherwise processed normally.
+
+```json
+{
+    "item_index": 2,
+    "warning": "Context exceeds 4 KB limit and was dropped",
+    "orderNumber": "3940"
+}
+```
+
+**Action required**: Reduce the size of the `context` object for this item.
+
 ### Ended Not Deleted
 
 A managed campaign was removed from the payload but has playback history, so it cannot be hard-deleted. Instead, its end_date was set to now, making it "finished".
@@ -318,6 +334,59 @@ The sync response campaign will include both:
     ]
 }
 ```
+
+## 1.7. Dry Run
+
+A dry run (`"dry_run": true` on the sync endpoint, or via the dedicated [Dry Run Endpoint](#3-dry-run-endpoint)) performs translation and full classification without making any changes. Unlike a live sync, it returns the detailed list of affected campaigns with their planned actions.
+
+**Dry run response**:
+
+```json
+{
+    "result": "dry_run",
+    "summary": {
+        "total_items_received": 4,
+        "campaigns_created": 1,
+        "campaigns_updated": 1,
+        "campaigns_ended": 0,
+        "campaigns_deleted": 0,
+        "skipped_linked": 0
+    },
+    "campaigns": [
+        {
+            "campaign_name": "VAMS #3940 - TOM FORD",
+            "action": "create",
+            "sub_campaigns": 2,
+            "context": [{ "groupKey": "abc-123" }]
+        },
+        {
+            "campaign_name": "VAMS #3941 - DIOR",
+            "campaign_id": 457,
+            "action": "update",
+            "sub_campaigns": 1
+        },
+        {
+            "campaign_name": "VAMS #3942 - CHANEL",
+            "campaign_id": 458,
+            "action": "delete"
+        }
+    ],
+    "warnings": [],
+    "errors": []
+}
+```
+
+**Dry run campaign actions**:
+
+| Action | Description |
+|--------|-------------|
+| `create` | Would create a new campaign |
+| `update` | Would update an existing managed campaign (includes `campaign_id`) |
+| `delete` | Would hard-delete a managed campaign not in payload (never played; includes `campaign_id`) |
+| `end` | Would set end_date = now on a managed campaign not in payload (has playback history; includes `campaign_id`) |
+| `skipped_linked` | Campaign is tagged as linked; would not be modified |
+
+**Note**: `campaign_id` is included for existing campaigns (`update`, `delete`, `end`) but not for `create` (since the campaign doesn't exist yet). The `context` array is included when the incoming items had context values.
 
 ---
 
@@ -463,3 +532,19 @@ Returned when `campaign_id` is provided. Content dimensions (aspect ratio) do no
 | `context` | The `context` from the item that provided this content (omitted if none) |
 
 **Action required**: The affected player will skip this campaign during playback. Provide content with a matching aspect ratio to resolve.
+
+---
+
+# 3. Dry Run Endpoint
+
+**Endpoint**: `POST /api/external_import_dry_run.php`
+
+**Authentication**: Bearer token (API key).
+
+```
+Authorization: Bearer {api_key}
+```
+
+A convenience endpoint that accepts the same payload format as the [Sync Endpoint](#1-sync-endpoint) and always forces `dry_run: true`. This avoids the need to include the `dry_run` parameter in the request body.
+
+The request and response formats are identical to the sync endpoint with `dry_run: true` — see [1.7. Dry Run](#17-dry-run) for the response format and campaign action values.
