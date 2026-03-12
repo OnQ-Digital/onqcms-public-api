@@ -29,7 +29,7 @@ The External Import API allows external systems (e.g., VAMS) to programmatically
 
 # 1. Sync Endpoint
 
-**Endpoint**: `POST /api/external_import_sync.php`
+**Endpoint**: `POST /api/external_import/sync`
 
 **Authentication**: Bearer token (API key).
 
@@ -392,7 +392,7 @@ A dry run (`"dry_run": true` on the sync endpoint, or via the dedicated [Dry Run
 
 # 2. Status Endpoint
 
-**Endpoint**: `GET /api/external_import_status.php` or `POST /api/external_import_status.php`
+**Endpoint**: `GET /api/external_import/status` or `POST /api/external_import/status`
 
 **Authentication**: Bearer token (API key).
 
@@ -408,17 +408,17 @@ Query by `content_ids` (filename UUIDs) and/or `campaign_id`. When `campaign_id`
 
 **By content IDs**:
 ```
-GET /api/external_import_status.php?content_ids=4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa,a1b2c3d4-e5f6-7890-abcd-ef1234567890
+GET /api/external_import/status?content_ids=4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa,a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
 **By campaign ID** (includes dimension warnings):
 ```
-GET /api/external_import_status.php?campaign_id=456
+GET /api/external_import/status?campaign_id=456
 ```
 
 **Both** (content_ids are merged with the campaign's content):
 ```
-GET /api/external_import_status.php?campaign_id=456&content_ids=4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa
+GET /api/external_import/status?campaign_id=456&content_ids=4vwhq2gg-zju2-lqlm-m1hn-e93xwgqrp9aa
 ```
 
 ## 2.2. Request Format (POST)
@@ -537,7 +537,7 @@ Returned when `campaign_id` is provided. Content dimensions (aspect ratio) do no
 
 # 3. Dry Run Endpoint
 
-**Endpoint**: `POST /api/external_import_dry_run.php`
+**Endpoint**: `POST /api/external_import/dry_run`
 
 **Authentication**: Bearer token (API key).
 
