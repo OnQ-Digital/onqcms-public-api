@@ -140,7 +140,8 @@ The sync response covers booking outcomes only. Use the [Status endpoint](#2-sta
     },
     "campaigns": [
         {
-            "campaign_name": "VAMS #3940 - TOM FORD",
+            "campaign_name": "3940",
+            "brand": "TOM FORD",
             "campaign_id": 456,
             "action": "created",
             "sub_campaigns": 1,
@@ -189,7 +190,7 @@ A player code from the payload could not be matched to any player in the CMS (vi
 {
     "type": "unmatched_player",
     "code": "UNKNOWN123",
-    "campaign": "VAMS #3940 - TOM FORD"
+    "campaign": "3940"
 }
 ```
 
@@ -203,7 +204,7 @@ An external slot name (e.g., `vaType`) has no mapping configured in the CMS admi
 {
     "warning": "Unmapped external slot",
     "slot": "Digital Screen - Escalator",
-    "campaign": "VAMS #3940 - TOM FORD"
+    "campaign": "3940"
 }
 ```
 
@@ -245,7 +246,7 @@ A managed campaign was removed from the payload but has playback history, so it 
 ```json
 {
     "type": "ended_not_deleted",
-    "campaign": "VAMS #3941 - DIOR",
+    "campaign": "3941",
     "campaign_id": 457,
     "reason": "has playback history"
 }
@@ -284,7 +285,7 @@ All URLs for a booking item failed content_id extraction. The item was skipped.
 ## 1.5. Sync Behavior
 
 **Grouping rules**:
-- Items with the same `orderNumber` become one CMS campaign (named `"VAMS #{orderNumber} - {brand}"`)
+- Items with the same `orderNumber` become one CMS campaign (named by the `orderNumber`, with the `brand` set as the campaign client)
 - Items with identical `startDate + endDate + slot + content` merge into one sub-campaign (players are merged)
 - Items with different schedules, slots, or content become separate sub-campaigns
 - If one external slot maps to multiple internal slot groups, one sub-campaign per group is created
@@ -325,7 +326,8 @@ The sync response campaign will include both:
 
 ```json
 {
-    "campaign_name": "VAMS #3940 - TOM FORD",
+    "campaign_name": "3940",
+            "brand": "TOM FORD",
     "campaign_id": 456,
     "action": "created",
     "context": [
@@ -354,19 +356,22 @@ A dry run (`"dry_run": true` on the sync endpoint, or via the dedicated [Dry Run
     },
     "campaigns": [
         {
-            "campaign_name": "VAMS #3940 - TOM FORD",
+            "campaign_name": "3940",
+            "brand": "TOM FORD",
             "action": "create",
             "sub_campaigns": 2,
             "context": [{ "groupKey": "abc-123" }]
         },
         {
-            "campaign_name": "VAMS #3941 - DIOR",
+            "campaign_name": "3941",
+            "brand": "DIOR",
             "campaign_id": 457,
             "action": "update",
             "sub_campaigns": 1
         },
         {
-            "campaign_name": "VAMS #3942 - CHANEL",
+            "campaign_name": "3942",
+            "brand": "CHANEL",
             "campaign_id": 458,
             "action": "delete"
         }
