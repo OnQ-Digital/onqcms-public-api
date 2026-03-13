@@ -136,7 +136,7 @@ The sync response covers booking outcomes only. Use the [Status endpoint](#2-sta
         "campaigns_updated": 0,
         "campaigns_ended": 0,
         "campaigns_deleted": 0,
-        "skipped_linked": 0
+        "skipped_manual": 0
     },
     "campaigns": [
         {
@@ -171,10 +171,10 @@ The sync response covers booking outcomes only. Use the [Status endpoint](#2-sta
 | Action | Description |
 |--------|-------------|
 | `created` | New campaign created |
-| `updated` | Existing live managed campaign updated (all sub-campaigns rebuilt) |
+| `updated` | Existing live campaign updated (all sub-campaigns rebuilt) |
 | `deleted` | Campaign hard-deleted (campaign had never been played) |
 | `ended` | Campaign end_date set to now (campaign has playback history, cannot be deleted) |
-| `skipped_linked` | Campaign is tagged as "linked" (user-managed); not modified by sync |
+| `skipped_manual` | Campaign is tagged as manually managed; not modified by sync |
 
 After a successful sync, use the `campaign_id` from the response to query the [Status endpoint](#2-status-endpoint) for content readiness and any dimension warnings.
 
@@ -241,7 +241,7 @@ An item's `context` object exceeds the 4 KB limit. The context is dropped for th
 
 ### Ended Not Deleted
 
-A managed campaign was removed from the payload but has playback history, so it cannot be hard-deleted. Instead, its end_date was set to now, making it "finished".
+An engine-owned campaign was removed from the payload but has playback history, so it cannot be hard-deleted. Instead, its end_date was set to now, making it "finished".
 
 ```json
 {
@@ -292,10 +292,10 @@ All URLs for a booking item failed content_id extraction. The item was skipped.
 
 **Lifecycle rules**:
 - New orders with no matching live campaign: CREATE
-- Orders matching a live managed campaign: UPDATE (rebuild all sub-campaigns)
-- Orders matching a live linked campaign: SKIP
-- Live managed campaigns missing from payload, never played: HARD DELETE
-- Live managed campaigns missing from payload, has played: SET end_date = NOW
+- Orders matching a live campaign: UPDATE (rebuild all sub-campaigns)
+- Orders matching a manually managed campaign: SKIP (opt-out)
+- Engine-owned campaigns missing from payload, never played: HARD DELETE
+- Engine-owned campaigns missing from payload, has played: SET end_date = NOW
 - Orders matching only expired campaigns: CREATE new (expired campaigns are invisible)
 
 **Content dedup**: Content is identified by the filename UUID extracted from the URL path (the `content_id`). If the same `content_id` already exists in the CMS, the existing content is reused without re-downloading.
@@ -352,7 +352,7 @@ A dry run (`"dry_run": true` on the sync endpoint, or via the dedicated [Dry Run
         "campaigns_updated": 1,
         "campaigns_ended": 0,
         "campaigns_deleted": 0,
-        "skipped_linked": 0
+        "skipped_manual": 0
     },
     "campaigns": [
         {
@@ -386,10 +386,10 @@ A dry run (`"dry_run": true` on the sync endpoint, or via the dedicated [Dry Run
 | Action | Description |
 |--------|-------------|
 | `create` | Would create a new campaign |
-| `update` | Would update an existing managed campaign (includes `campaign_id`) |
-| `delete` | Would hard-delete a managed campaign not in payload (never played; includes `campaign_id`) |
-| `end` | Would set end_date = now on a managed campaign not in payload (has playback history; includes `campaign_id`) |
-| `skipped_linked` | Campaign is tagged as linked; would not be modified |
+| `update` | Would update an existing campaign (includes `campaign_id`) |
+| `delete` | Would hard-delete an engine-owned campaign not in payload (never played; includes `campaign_id`) |
+| `end` | Would set end_date = now on an engine-owned campaign not in payload (has playback history; includes `campaign_id`) |
+| `skipped_manual` | Campaign is tagged as manually managed; would not be modified |
 
 **Note**: `campaign_id` is included for existing campaigns (`update`, `delete`, `end`) but not for `create` (since the campaign doesn't exist yet). The `context` array is included when the incoming items had context values.
 
